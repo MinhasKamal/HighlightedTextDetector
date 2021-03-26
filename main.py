@@ -7,6 +7,9 @@ from PIL import Image, ImageDraw
 import datetime
 
 
+GOOGLE_VISION_API_KEY_PATH = "C:/Users/HP/.google-cloud/my-key.json"
+
+
 def histogram_equalization(input_img_path, histogram_equalized_img_path):
     rgb_img = cv2.imread(input_img_path)
 
@@ -20,7 +23,7 @@ def histogram_equalization(input_img_path, histogram_equalized_img_path):
     cv2.imwrite(histogram_equalized_img_path, equalized_img)
 
 
-def detect_color(input_img_path, color_detected_img_path):
+def calculate_chroma(input_img_path, color_detected_img_path):
     input_img = cv2.imread(input_img_path)
 
     for column in input_img:
@@ -46,7 +49,7 @@ def detect_highlight(input_img_path):
     histogram_equalized_img_path = "o_01_histogram_equalized.png"
     histogram_equalization(input_img_path, histogram_equalized_img_path)
     color_detected_img_path = "o_02_color_detected.png"
-    detect_color(histogram_equalized_img_path, color_detected_img_path)
+    calculate_chroma(histogram_equalized_img_path, color_detected_img_path)
     threshold_img_path = "o_03_threshold.png"
     otsu_thresholding(color_detected_img_path, threshold_img_path)
 
@@ -59,7 +62,7 @@ def run_google_text_detection(input_img_path):
         input_img_file = img_file.read()
 
     input_img = vision.Image(content=input_img_file)
-    client = vision.ImageAnnotatorClient.from_service_account_json("C:/Users/HP/.google-cloud/my-key.json")
+    client = vision.ImageAnnotatorClient.from_service_account_json(GOOGLE_VISION_API_KEY_PATH)
     return client.document_text_detection(image=input_img)
 
 
@@ -96,6 +99,9 @@ def is_word_highlighted(highlight_mask, word_bounding_poly):
     cv2.fillConvexPoly(word_mask, word_bounding_poly, 255)
 
     word_part_of_highlight_mask = highlight_mask[word_mask > 0]
+    if word_part_of_highlight_mask.size < 1:
+        return False
+
     only_highlight_part_count = numpy.count_nonzero(word_part_of_highlight_mask > 0)
     only_highlight_part_ratio = only_highlight_part_count / word_part_of_highlight_mask.size
 
@@ -126,10 +132,9 @@ def get_highlighted_word_objects(highlight_mask_path, google_word_objects):
     return highlighted_google_word_objects
 
 
-def visualize_detected_word_boundaries(google_word_objects, input_image_path, word_marked_image_path):
-
-    input_image = Image.open(input_image_path)
-    draw = ImageDraw.Draw(input_image)
+def visualize_detected_word_boundaries(google_word_objects, input_img_path, word_marked_img_path):
+    input_img = Image.open(input_img_path)
+    draw = ImageDraw.Draw(input_img)
 
     for google_word_object in google_word_objects:
         poly = google_word_object.bounding_poly.vertices
@@ -138,8 +143,8 @@ def visualize_detected_word_boundaries(google_word_objects, input_image_path, wo
                       poly[2].x, poly[2].y,
                       poly[3].x, poly[3].y], None, 'red')
 
-    # input_image.show()
-    input_image.save(word_marked_image_path)
+    # input_img.show()
+    input_img.save(word_marked_img_path)
 
 
 def dump_text(google_word_objects, dump_file_path):
@@ -152,22 +157,23 @@ def dump_text(google_word_objects, dump_file_path):
 
 
 def show_result(highlighted_google_word_objects, input_img_path):
-    word_marked_image_path = "o_05_word_marked.png"
-    visualize_detected_word_boundaries(highlighted_google_word_objects, input_img_path, word_marked_image_path)
+    word_marked_img_path = "o_06_highlighted_word_marked.png"
+    visualize_detected_word_boundaries(highlighted_google_word_objects, input_img_path, word_marked_img_path)
 
-    highlighted_text_file_path = "o_06_highlighted_text.txt"
+    highlighted_text_file_path = "o_07_highlighted_text.txt"
     dump_text(highlighted_google_word_objects, highlighted_text_file_path)
 
     print("result is shown")
 
 
 def main():
-    input_img_path = "bengali-highlight-sample.jpg"
+    input_img_path = "english-highlight-sample.jpg"
 
     highlight_mask_path = detect_highlight(input_img_path)
 
     google_api_response = get_google_api_response(input_img_path)
     google_word_objects = get_all_word_objects(google_api_response)
+    visualize_detected_word_boundaries(google_word_objects, input_img_path, "o_05_all_word_marked.png")
 
     highlighted_google_word_objects = get_highlighted_word_objects(highlight_mask_path, google_word_objects)
 
