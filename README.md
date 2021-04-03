@@ -25,4 +25,4 @@ pip install Pillow
 
 For details, visit [the official guide](https://cloud.google.com/vision/docs/quickstart#set_up_a_google_cloud_vision_api_project).
 
-4. Open main.py > update the variable `GOOGLE_VISION_API_KEY_PATH` with your API Key (downloaded JSON) file path > the main.py
+4. Open main.py > update the variable `GOOGLE_VISION_API_KEY_PATH` with your API Key (downloaded JSON) file path > then run processStepByStep.py

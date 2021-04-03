@@ -167,7 +167,8 @@ def show_result(highlighted_google_word_objects, input_img_path):
 
 
 def main():
-    input_img_path = "english-highlight-sample.jpg"
+    # input_img_path = "highlighted-bengali-sample.jpg"
+    input_img_path = "highlighted-english-sample.jpg"
 
     highlight_mask_path = detect_highlight(input_img_path)
 
