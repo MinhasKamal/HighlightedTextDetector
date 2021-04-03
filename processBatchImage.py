@@ -5,14 +5,28 @@ import numpy
 import json
 from PIL import Image, ImageDraw
 import datetime
+from os import walk, path
+import sys
 
 
 GOOGLE_VISION_API_KEY_PATH = "C:/Users/HP/.google-cloud/my-key.json"
 
 
-def histogram_equalization(input_img_path, histogram_equalized_img_path):
-    rgb_img = cv2.imread(input_img_path)
+def get_directory_path_from_command_argument():
+    if len(sys.argv) < 2:
+        print("argument list is empty")
+        return ""
 
+    directory_path = sys.argv[1]
+    if not path.isdir(directory_path):
+        print("provided argument is not a valid directory")
+        return ""
+
+    print("directory_path: " + directory_path)
+    return directory_path
+
+
+def histogram_equalization(rgb_img):
     # convert from RGB color-space to YCrCb
     ycrcb_img = cv2.cvtColor(rgb_img, cv2.COLOR_BGR2YCrCb)
 
@@ -20,41 +34,40 @@ def histogram_equalization(input_img_path, histogram_equalized_img_path):
     ycrcb_img[:, :, 0] = cv2.equalizeHist(ycrcb_img[:, :, 0])
 
     equalized_img = cv2.cvtColor(ycrcb_img, cv2.COLOR_YCrCb2BGR)
-    cv2.imwrite(histogram_equalized_img_path, equalized_img)
+    # cv2.imwrite("o_01_histogram_equalized.png", equalized_img)
+    return equalized_img
 
 
-def calculate_chroma(input_img_path, color_detected_img_path):
-    input_img = cv2.imread(input_img_path)
+def calculate_chroma(rgb_img):
+    rows, cols = rgb_img.shape[:2]
+    color_detected_img = numpy.zeros((rows, cols, 1), numpy.uint8)
 
-    for column in input_img:
-        for pixel in column:
+    for r in range(rows):
+        for c in range(cols):
+            pixel = rgb_img[r, c]
             min_color = min(pixel[0], pixel[1], pixel[2])
             max_color = max(pixel[0], pixel[1], pixel[2])
-            pixel[0] = max_color - min_color
-            pixel[1] = pixel[0]
-            pixel[2] = pixel[0]
+            color_detected_img[r, c] = max_color - min_color
 
-    cv2.imwrite(color_detected_img_path, input_img)
+    # cv2.imwrite("o_02_color_detected.png", color_detected_img)
+    return color_detected_img
 
 
-def otsu_thresholding(input_img_path, threshold_img_path):
-    input_img = cv2.imread(input_img_path, cv2.IMREAD_GRAYSCALE)
+def otsu_thresholding(grayscale_img):
+    ret, threshold_img = cv2.threshold(grayscale_img, 0, 255, cv2.THRESH_OTSU)
 
-    ret, threshold_img = cv2.threshold(input_img, 0, 255, cv2.THRESH_OTSU)
-
-    cv2.imwrite(threshold_img_path, threshold_img)
+    # cv2.imwrite("o_03_threshold.png", threshold_img)
+    return threshold_img
 
 
 def detect_highlight(input_img_path):
-    histogram_equalized_img_path = "o_01_histogram_equalized.png"
-    histogram_equalization(input_img_path, histogram_equalized_img_path)
-    color_detected_img_path = "o_02_color_detected.png"
-    calculate_chroma(histogram_equalized_img_path, color_detected_img_path)
-    threshold_img_path = "o_03_threshold.png"
-    otsu_thresholding(color_detected_img_path, threshold_img_path)
+    rgb_img = cv2.imread(input_img_path)
+    equalized_img = histogram_equalization(rgb_img)
+    color_detected_img = calculate_chroma(equalized_img)
+    threshold_img = otsu_thresholding(color_detected_img)
 
     print("highlight mask is ready")
-    return threshold_img_path
+    return threshold_img
 
 
 def run_google_text_detection(input_img_path):
@@ -69,10 +82,10 @@ def run_google_text_detection(input_img_path):
 def get_google_api_response(input_img_path):
     google_api_response = run_google_text_detection(input_img_path)
 
-    google_api_response_json = vision.AnnotateImageResponse.to_json(google_api_response)
-    google_api_response_dump_path = "o_04_google_api_response.txt"
-    with open(google_api_response_dump_path, 'w') as json_file:
-        json.dump(google_api_response_json, json_file)
+    # google_api_response_json = vision.AnnotateImageResponse.to_json(google_api_response)
+    # google_api_response_dump_path = "o_04_google_api_response.txt"
+    # with open(google_api_response_dump_path, 'w') as json_file:
+    #     json.dump(google_api_response_json, json_file)
 
     # with open(google_api_response_dump_path, 'r') as json_file:
     #     google_api_response_json = json.load(json_file)
@@ -113,9 +126,7 @@ def is_word_highlighted(highlight_mask, word_bounding_poly):
         return False
 
 
-def get_highlighted_word_objects(highlight_mask_path, google_word_objects):
-    highlight_mask = cv2.imread(highlight_mask_path)
-
+def get_highlighted_word_objects(highlight_mask, google_word_objects):
     highlighted_google_word_objects = []
 
     for google_word_object in google_word_objects:
@@ -167,20 +178,27 @@ def show_result(highlighted_google_word_objects, input_img_path):
 
 
 def main():
-    # input_img_path = "highlighted-bengali-sample.jpg"
-    input_img_path = "highlighted-english-sample.jpg"
+    input_img_dir_path = get_directory_path_from_command_argument()
+    if input_img_dir_path == "":
+        return
 
-    highlight_mask_path = detect_highlight(input_img_path)
+    _, _, files = next(walk(input_img_dir_path))
 
-    google_api_response = get_google_api_response(input_img_path)
-    google_word_objects = get_all_word_objects(google_api_response)
-    visualize_detected_word_boundaries(google_word_objects, input_img_path, "o_05_all_word_marked.png")
+    for file in files:
+        input_img_path = input_img_dir_path + "/" + file
+        print("# processing- " + input_img_path)
 
-    highlighted_google_word_objects = get_highlighted_word_objects(highlight_mask_path, google_word_objects)
+        highlight_mask = detect_highlight(input_img_path)
 
-    show_result(highlighted_google_word_objects, input_img_path)
+        google_api_response = get_google_api_response(input_img_path)
+        google_word_objects = get_all_word_objects(google_api_response)
+        # visualize_detected_word_boundaries(google_word_objects, input_img_path, "o_05_all_word_marked.png")
 
-    print("process successful!")
+        highlighted_google_word_objects = get_highlighted_word_objects(highlight_mask, google_word_objects)
+        # show_result(highlighted_google_word_objects, input_img_path)
+        dump_text(highlighted_google_word_objects, input_img_path + ".txt")
+
+    print("## task complete!")
 
 
 if __name__ == '__main__':
