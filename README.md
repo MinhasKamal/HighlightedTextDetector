@@ -3,6 +3,11 @@
 
 Process an image of a page taken by a handheld device to detect the highlighted portion of the text, and then running OCR for extracting the highlighted text.
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/MinhasKamal/HighlightedTextDetector/main/highlighted-bengali-sample.jpg" alt="Bengali Sample Image" width=auto height="300px"/>
+  <img src="https://raw.githubusercontent.com/MinhasKamal/HighlightedTextDetector/main/highlighted-english-sample.jpg" alt="English Sample Image" width=auto height="300px"/>
+</div>
+
 ## Running The Project
 
 1. Clone the project from GitHub and import (File > Open) it into PyCharm.
